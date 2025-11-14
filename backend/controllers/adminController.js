@@ -7,59 +7,111 @@ import doctorModel from '../models/doctorModel.js'
 import appointmentsModel from '../models/appointmentModel.js'
 import userModel from '../models/userModel.js'
 
-//api for adding doctor
-const addDoctor = async(req,res) => {
-    try{
-        const {name,email,password,speciality,degree,experience,about,fees,address} = req.body;
-        const imageFile = req.file
+// //api for adding doctor
+const addDoctor = async (req, res) => {
+  try {
+    const { name, email, password, speciality, degree, experience, about, fees, city } = req.body;
+    const imageFile = req.file;
+
+    // Validate required fields
+    if (!name || !email || !password || !speciality || !degree || !experience || !about || !fees || !city || !imageFile) {
+      console.log(req.body, req.file); // debug
+      return res.json({ success: false, message: "Missing details" });
+    }
+
+    // Email validation
+    if (!validator.isEmail(email)) return res.json({ success: false, message: "Invalid email" });
+
+    // Password validation
+    if (password.length < 8) return res.json({ success: false, message: "Password too short" });
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Upload image to Cloudinary
+    const imageUpload = await cloudinary.v2.uploader.upload(imageFile.path, { resource_type: "image" });
+    const imageUrl = imageUpload.secure_url;
+
+    // Create doctor
+    const doctorData = {
+      name,
+      email,
+      password: hashedPassword,
+      speciality,
+      degree,
+      experience,
+      about,
+      fees,
+      address: { city }, // simplified
+      image: imageUrl,
+      date: Date.now(),
+    };
+
+    const newDoctor = new doctorModel(doctorData);
+    await newDoctor.save();
+
+    res.json({ success: true, message: "Doctor added" });
+  } catch (err) {
+    console.log("Error adding doctor:", err);
+    res.json({ success: false, message: err.message });
+  }
+};
+
+
+// export { addDoctor };
+// const addDoctor = async(req,res) => {
+//     try{
+//         const {name,email,password,speciality,degree,experience,about,fees,address} = req.body;
+//         const imageFile = req.file
         
-        //checking for all data to add doctor
-        if(!name || !email || !password || !speciality || !degree || !experience || !about || !fees || !address){
-            return res.json({success: false,message: "Missing details"});
-        }
+//         //checking for all data to add doctor
+//         if(!name || !email || !password || !speciality || !degree || !experience || !about || !fees || !address){
+//             return res.json({success: false,message: "Missing details"});
+//         }
 
-        //validating the email format
-        if(!validator.isEmail(email)){
-            return res.json({success: false,message: "Please enter valid email"});
-        }
+//         //validating the email format
+//         if(!validator.isEmail(email)){
+//             return res.json({success: false,message: "Please enter valid email"});
+//         }
 
-        //validate password
-        if(password.length < 8){
-            return res.json({success: false,message: "Please enter a strong password"});
-        }
+//         //validate password
+//         if(password.length < 8){
+//             return res.json({success: false,message: "Please enter a strong password"});
+//         }
 
-        //hashing the doctor password
-        const salt = await bcrypt.genSalt(10)
-        const hashedPassword = await bcrypt.hash(password,salt)
+//         //hashing the doctor password
+//         const salt = await bcrypt.genSalt(10)
+//         const hashedPassword = await bcrypt.hash(password,salt)
 
-        // upload image to cloudinary
-        const imageUpload = await cloudinary.v2.uploader.upload(imageFile.path,{resource_type:"image"});
-        const imageUrl = imageUpload.secure_url;
+//         // upload image to cloudinary
+//         const imageUpload = await cloudinary.v2.uploader.upload(imageFile.path,{resource_type:"image"});
+//         const imageUrl = imageUpload.secure_url;
 
-        const doctorData = {
-            name,
-            email,
-            image:imageUrl,
-            password:hashedPassword,
-            speciality,
-            degree,
-            experience,
-            about,
-            fees,
-            address:JSON.parse(address),
-            date:Date.now()
-        }
+//         const doctorData = {
+//             name,
+//             email,
+//             image:imageUrl,
+//             password:hashedPassword,
+//             speciality,
+//             degree,
+//             experience,
+//             about,
+//             fees,
+//             address:JSON.parse(address),
+//             date:Date.now()
+//         }
 
-        const newDoctor = new doctorModel(doctorData)
-        await newDoctor.save()
+//         const newDoctor = new doctorModel(doctorData)
+//         await newDoctor.save()
 
-        res.json({success:true,message:"doctor added"});
-    }
-    catch(err){
-        console.log("error in adding data by admin : ",err);
-        res.json({success:false,message:err.message})
-    }
-}
+//         res.json({success:true,message:"doctor added"});
+//     }
+//     catch(err){
+//         console.log("error in adding data by admin : ",err);
+//         res.json({success:false,message:err.message})
+//     }
+// }
 
 //api for the admin login
 const loginAdmin = async(req,res) => {

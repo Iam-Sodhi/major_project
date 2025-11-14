@@ -5,12 +5,16 @@ import connectDB from './config/db.js';
 import adminRouter from './routes/adminRoute.js';
 import doctorRouter from './routes/doctorRoute.js';
 import userRouter from './routes/userRoute.js';
+import connectCloudinary from './config/cloudinary.js';
+
+
 
 //app config
 const app = express();
 const port = process.env.PORT || 3000
 connectDB();
-
+// call this before any Cloudinary upload
+connectCloudinary();
 
 //middlewares
 app.use(express.json())
