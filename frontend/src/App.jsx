@@ -17,6 +17,10 @@ import AboutUs from './components/AboutUs/AboutUs.jsx'
 import ContactUs from './components/ContactUs/ContactUs.jsx';
 import VideoCall from './components/VideoCall/VideoCall.jsx';
 
+import AdminLogin from './admin/AdminLogin.jsx';
+import AdminDashboard from './admin/AdminDashboard.jsx';
+import AdminDoctors from './admin/AdminDoctors.jsx';
+import AdminAppointments from './admin/AdminAppointments.jsx';
 const App = () => {
   const location = useLocation();
 
@@ -42,6 +46,12 @@ const App = () => {
             <Route path='/login' element={<Login/>} />
             <Route path='/about-us' element={<AboutUs/>} />
             <Route path='/contact-us' element={<ContactUs/>} />
+                {/* ADMIN ROUTES */}
+            <Route path='/admin/login' element={<AdminLogin />} />
+            <Route path='/admin' element={<AdminDashboard />} />
+            <Route path='/admin/doctors' element={<AdminDoctors />} />
+            <Route path='/admin/appointments' element={<AdminAppointments />} />
+
             {/* <Route path='/contract' element={<ton/>} /> */}
           </Routes>
         </div>
