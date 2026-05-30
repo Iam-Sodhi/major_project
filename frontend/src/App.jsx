@@ -1,5 +1,5 @@
 import React from 'react'
-import { Route,Routes,useLocation } from 'react-router-dom'
+import { Route,Routes} from 'react-router-dom'
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -10,7 +10,6 @@ import PredictPage from './pages/PredictPage.jsx'
 import AllDoctors from './components/AllDoctors/AllDoctors.jsx'
 import Appointment from './components/Appointments/Appointment.jsx'
 import AllAppointments from './components/Dashboard/AllAppointments.jsx'
-import Sidebar from './components/Sidebar/Sidebar.jsx'
 import BuyingPage from './pages/BuyingPage.jsx';
 import Login from './components/Login/Login.jsx';
 import AboutUs from './components/AboutUs/AboutUs.jsx'
@@ -22,7 +21,6 @@ import AdminDashboard from './admin/AdminDashboard.jsx';
 import AdminDoctors from './admin/AdminDoctors.jsx';
 import AdminAppointments from './admin/AdminAppointments.jsx';
 const App = () => {
-  const location = useLocation();
 
   return (
     <>
