@@ -1,262 +1,270 @@
-⏺ Here's a full breakdown of the project architecture and how each technology is used:
-                                                                                                                                  
-  ---
-  Project: AUREA — AI-Powered Dermatology Platform                                                                                      
-                                                                                                                                        
-  ---                                                                                                                                   
-  Overall Architecture                                                                                                                  
-                                                            
-  ┌─────────────────────────────────────────────────────────┐
-  │                    THREE PORTALS                        │                                                                           
-  │                                                         │
-  │  frontend/          doctor/           backend/          │                                                                           
-  │  (Patient App)      (Doctor App)      (Node.js API)     │                                                                           
-  │  React + Vite       React + Vite      Express + MongoDB │                                                                           
-  │  Port: 5173         Port: 5174        Port: 3000        │                                                                           
-  └─────────────────────────────────────────────────────────┘                                                                           
-                                                            
-  All three talk to one shared backend. The backend connects to MongoDB Atlas (cloud database), Cloudinary (image hosting), and Pinata  
-  (IPFS).                                                   
-                                                                                                                                        
-  ---                                                       
-  1. User Roles & Authentication
-                                
-  There are three roles, each with their own auth:
-                                                                                                                                        
-  Patient (User)
-  - Registers/logs in via /api/user/register and /api/user/login                                                                        
-  - Gets a JWT token stored in localStorage                                                                                             
-  - Every protected request sends Authorization: Bearer <token> in the header
-  - authUser middleware on the backend decodes the token → extracts userId → injects into req.body                                      
-                                                                                                                                        
-  Doctor                                                                                                                                
-  - Separate login at /api/doctor/login                                                                                                 
-  - Uses their own JWT token in the Doctor portal                                                                                       
-  - authDoctor middleware protects doctor routes            
-                                                                                                                                        
-  Admin                                                                                                                                 
-  - Hardcoded credentials in .env (ADMIN_EMAIL, ADMIN_PASSWORD)                                                                         
-  - On login, backend signs email+password as a JWT string                                                                              
-  - authAdmin middleware verifies it matches the stored credentials
-                                                                                                                                        
-  ---
-  2. Core Features                                                                                                                      
-                                                                                                                                        
-  Appointment Booking Flow
-                                                                                                                                        
-  Patient selects doctor → picks date/time slot             
-       → POST /api/user/bookAppointment                                                                                                 
-       → Backend checks if slot already taken (slots_booked map on Doctor model)                                                        
-       → Creates Appointment document in MongoDB                                                                                        
-       → Updates doctor's slots_booked                                                                                                  
-  Doctor model stores booked slots as:                                                                                                  
-  slots_booked: {                                                                                                                       
-    "25_11_2024": ["10:00 am", "11:00 am"],                                                                                             
-    "26_11_2024": ["2:00 pm"]                                                                                                           
-  }                                                                                                                                     
-                                                                                                                                        
-  Video Consultation                                                                                                                    
-                                                                                                                                        
-  - Uses Firebase Firestore as a WebRTC signaling server                                                                                
-  - Patient and doctor both open /video-call
-  - One side creates an offer → stores in Firestore → other side reads it and sends answer                                              
-  - Direct peer-to-peer video connection established (no video data goes through Firebase, only the connection handshake)               
-                                                                                                                                        
-  Doctor Profile Images                                                                                                                 
-                                                                                                                                        
-  - Admin uploads a doctor's photo via the Add Doctor form                                                                              
-  - Multer saves the file temporarily to disk
-  - Backend uploads it to Cloudinary → gets a permanent HTTPS URL                                                                       
-  - That URL is stored in the Doctor document in MongoDB                                                                                
-                                                                                                                                        
-  ---                                                                                                                                   
-  3. IPFS / Pinata Integration                                                                                                          
-                                                            
-  What problem does it solve?
-  Medical data is sensitive. Storing it on a central server (MongoDB) means one breach exposes everything. IPFS (InterPlanetary File
-  System) is a decentralized storage network where data is content-addressed — meaning a file is identified by a hash of its content,   
-  not a location. Pinata is a service that pins files to IPFS so they stay accessible.
-                                                                                                                                        
-  How it's used in AUREA:                                   
+Here's a full breakdown of the project architecture and how each technology is used:
 
-  Patient Profile Image Upload                                                                                                          
-   
-  Patient edits profile → selects new photo                                                                                             
-       → Frontend uploads file directly to Pinata API       
-       → Pinata returns IPFS hash (e.g. "QmXyz...")                                                                                     
-       → Frontend constructs URL: https://gateway.pinata.cloud/ipfs/QmXyz...
-       → Saves that URL to user profile via PUT /api/user/updateProfileData                                                             
-                                                                                                                                        
-  Marketplace Data Upload (the main IPFS use case)                                                                                      
-                                                                                                                                        
-  Patient fills "List My Data" form on Profile page                                                                                     
-       → Frontend sends form data to POST /api/marketplace/list                                                                         
-       → Backend (marketplaceController.js) takes the data:                                                                             
-             { disease, ageRange, gender, symptoms, treatmentHistory, medications }                                                     
-       → Converts it to JSON → uploads to Pinata via their API                                                                          
-       → Pinata stores on IPFS → returns a content hash (ipfsHash)                                                                      
-       → Backend stores a Marketplace listing in MongoDB:                                                                               
-             { sellerId, disease, ageRange, priceInTON, ipfsHash, buyers: [] }                                                          
-       → The ipfsHash is NEVER shown to buyers until they pay                                                                           
-                                                                                                                                        
-  Why IPFS for this?                                                                                                                    
-  - The data is stored decentrally — not on AUREA's servers                                                                             
-  - The patient owns their data (they have the hash)                                                                                    
-  - Once purchased, a buyer gets a permanent, tamper-proof URL to the dataset
-  - Nobody can alter the data after upload (content-addressed)                                                                          
-                                                                                                                                        
-  ---                                                                                                                                   
-  4. TON Blockchain Integration                                                                                                         
-                                                                                                                                        
-  What is TON?                                              
-  TON (The Open Network) is a blockchain developed by Telegram. It's fast and has very low transaction fees (~0.01 TON = fractions of a
-  cent). AUREA uses it for payments in the data marketplace.                                                                            
-   
-  TonConnect                                                                                                                            
-  TonConnect is a protocol (like WalletConnect for Ethereum) that lets users connect their TON wallet (e.g. Tonkeeper app) to a website
-  without giving the site access to their private keys.                                                                                 
-   
-  How the payment flow works:                                                                                                           
-                                                            
-  Step 1 — Researcher visits /buy page
-           → Sees listings fetched from GET /api/marketplace/listings                                                                   
-           → Listings show: disease, age range, price in TON (no IPFS hash yet)                                                         
-                                                                                                                                        
-  Step 2 — Researcher clicks "Connect TON Wallet"                                                                                       
-           → TonConnectUIProvider (in main.jsx) opens a QR code modal                                                                   
-           → User scans with Tonkeeper app → wallet is connected                                                                        
-           → useTonWallet() hook now returns wallet address
-                                                                                                                                        
-  Step 3 — Researcher clicks "Buy Data (0.1 TON)"                                                                                       
-           → Frontend calls tonConnectUI.sendTransaction({                                                                              
-                 address: PROJECT_WALLET,   ← receives the payment                                                                      
-                 amount: toNano("0.1")      ← converts TON to nanoton (1 TON = 10^9 nanoton)                                            
-             })                                                                                                                         
-           → Tonkeeper app shows confirmation to user                                                                                   
-           → User approves → transaction sent to TON blockchain                                                                         
-           → Returns a transaction BOC (bag of cells — TON's tx format) as proof
-                                                                                                                                        
-  Step 4 — Frontend sends proof to backend                  
-           → POST /api/marketplace/purchase { listingId, txHash: tx.boc }                                                               
-           → Backend records the purchase:                                                                                              
-                 listing.buyers.push({ buyerId, txHash, purchasedAt })                                                                  
-           → Backend returns the ipfsHash                                                                                               
-           → Frontend constructs: https://gateway.pinata.cloud/ipfs/<hash>                                                              
-           → "Buy Data" button changes to "View Data (IPFS)" link                                                                       
-                                                                                                                                        
-  What the blockchain provides:                                                                                                         
-  - Payment is recorded on the TON blockchain permanently — immutable proof of purchase                                                 
-  - No bank or payment gateway needed                                                                                                   
-  - Anyone worldwide can buy with crypto, no credit card or KYC
-  - The txHash stored in MongoDB creates an audit trail linking each purchase to an on-chain transaction                                
-                                                                                                                                        
-  ---                                                                                                                                   
-  5. Data Flow Diagram                                                                                                                  
-                                                                                                                                        
-  PATIENT (seller)                    RESEARCHER (buyer)    
-  ─────────────────                   ──────────────────                                                                                
-  Profile page                        /buy page
-  │                                   │                                                                                                 
-  │ Fill "List My Data" form           │ Connect TON wallet 
-  │        │                          │        │                                                                                        
-  │        ▼                          │        ▼                                                                                        
-  │   Backend API                     │   Backend API
-  │   /api/marketplace/list           │   /api/marketplace/listings                                                                     
-  │        │                          │        │                                                                                        
-  │        ▼                          │        ▼
-  │   Pinata/IPFS ◄──── JSON data     │   MongoDB (public fields only)                                                                  
-  │   Returns: ipfsHash               │   (ipfsHash hidden)                                                                             
-  │        │                          │                                                                                                 
-  │        ▼                          │   Researcher clicks Buy                                                                         
-  │   MongoDB Listing                 │        │                                                                                        
-  │   { ipfsHash: "Qm...",            │        ▼            
-  │     priceInTON: 0.1 }             │   TON Blockchain payment                                                                        
-  │                                   │        │            
-  │                                   │        ▼                                                                                        
-  │                                   │   Backend /api/marketplace/purchase                                                             
-  │                                   │   { txHash recorded, ipfsHash returned }
-  │                                   │        │                                                                                        
-  │                                   │        ▼            
-  │                                   │   https://gateway.pinata.cloud/ipfs/Qm...                                                       
-  │                                   │   (buyer can now access the data)
-                                                                                                                                        
-  ---
-  6. Database Models Summary                                                                                                            
-                                                                                                                                        
-  ┌─────────────┬─────────────────┬───────────────────────────────────────────────────────┐
-  │    Model    │     Purpose     │                      Key Fields                       │                                             
-  ├─────────────┼─────────────────┼───────────────────────────────────────────────────────┤
-  │ User        │ Patient account │ name, email, password (hashed), image (IPFS URL)      │
-  ├─────────────┼─────────────────┼───────────────────────────────────────────────────────┤
-  │ Doctor      │ Doctor account  │ name, speciality, fees, slots_booked, available       │                                             
-  ├─────────────┼─────────────────┼───────────────────────────────────────────────────────┤                                             
-  │ Appointment │ Booking record  │ userId, docId, slotDate, slotTime, payment, cancelled │                                             
-  ├─────────────┼─────────────────┼───────────────────────────────────────────────────────┤                                             
-  │ Marketplace │ Data listing    │ sellerId, disease, priceInTON, ipfsHash, buyers[]     │
-  └─────────────┴─────────────────┴───────────────────────────────────────────────────────┘                                             
-                                                            
-  ---                                                                                                                                   
-  7. Backend API Routes                                     
-                       
-  ┌─────────────────────────────────┬──────────┬────────────────────────┐
-  │              Route              │   Auth   │        Purpose         │                                                               
-  ├─────────────────────────────────┼──────────┼────────────────────────┤
-  │ POST /api/user/register         │ None     │ Create patient account │                                                               
-  ├─────────────────────────────────┼──────────┼────────────────────────┤
-  │ POST /api/user/login            │ None     │ Get JWT token          │
-  ├─────────────────────────────────┼──────────┼────────────────────────┤                                                               
-  │ GET /api/user/getProfile         │ User JWT │ Fetch own profile          │
-  ├──────────────────────────────────┼──────────┼────────────────────────────┤                                                          
-  │ PUT /api/user/updateProfileData  │ User JWT │ Save profile changes       │
-  ├──────────────────────────────────┼──────────┼────────────────────────────┤                                                          
-  │ POST /api/user/bookAppointment   │ User JWT   │ Book a slot                │
-  ├──────────────────────────────────┼────────────┼────────────────────────────┤                                                        
-  │ GET /api/user/listAppointments   │ User JWT   │ My appointments            │
-  ├──────────────────────────────────┼────────────┼────────────────────────────┤                                                        
-  │ POST /api/user/cancelAppointment │ User JWT   │ Cancel booking             │
-  ├──────────────────────────────────┼────────────┼────────────────────────────┤                                                        
-  │ GET /api/doctor/list             │ None       │ All doctors (for browsing) │
-  ├──────────────────────────────────┼────────────┼────────────────────────────┤                                                        
-  │ POST /api/doctor/login           │ None       │ Doctor login               │
-  ├──────────────────────────────────┼────────────┼────────────────────────────┤                                                        
-  │ GET /api/doctor/appointments     │ Doctor JWT │ Doctor's bookings                   │
-  ├──────────────────────────────────┼────────────┼─────────────────────────────────────┤                                               
-  │ POST /api/admin/addDoctor        │ Admin JWT  │ Add new doctor                      │
-  ├──────────────────────────────────┼────────────┼─────────────────────────────────────┤                                               
-  │ POST /api/marketplace/list       │ User JWT   │ List data on IPFS                   │
-  ├──────────────────────────────────┼────────────┼─────────────────────────────────────┤                                               
-  │ GET /api/marketplace/listings    │ None       │ Browse marketplace                  │
-  ├──────────────────────────────────┼────────────┼─────────────────────────────────────┤                                               
-  │ POST /api/marketplace/purchase   │ User JWT   │ Record TON payment, get IPFS access │
-  ├──────────────────────────────────┼────────────┼─────────────────────────────────────┤                                               
-  │ GET /api/marketplace/mylistings  │ User JWT   │ My listed datasets                  │
-  ├──────────────────────────────────┼────────────┼─────────────────────────────────────┤                                               
-  │ GET /api/marketplace/mypurchases │ User JWT   │ Datasets I bought                   │
-  └──────────────────────────────────┴────────────┴─────────────────────────────────────┘                                               
-                                                            
-  ---                                                                                                                                   
-  8. Tech Stack Summary Table                               
+---
+Project: AUREA — AI-Powered Dermatology Platform
 
-  ┌─────────────┬─────────────────────────┬──────────────────────────────────┐
-  │     Layer     │       Technology        │               Why                │
-  ├───────────────┼─────────────────────────┼──────────────────────────────────┤
-  │ Frontend UI           │ React + Vite + Tailwind │ Fast SPA, responsive design           │
-  ├───────────────────────┼─────────────────────────┼───────────────────────────────────────┤
-  │ Backend API           │ Node.js + Express       │ REST API, JWT auth                    │                                           
-  ├───────────────────────┼─────────────────────────┼───────────────────────────────────────┤                                           
-  │ Database              │ MongoDB Atlas           │ Flexible schema for medical data      │                                           
-  ├───────────────────────┼─────────────────────────┼───────────────────────────────────────┤                                           
-  │ Image hosting         │ Cloudinary                         │ Managed CDN for doctor photos                 │
-  ├───────────────────────┼────────────────────────────────────┼───────────────────────────────────────────────┤                        
-  │ Decentralized storage │ IPFS via Pinata                    │ Immutable, decentralized medical data         │
-  ├───────────────────────┼────────────────────────────────────┼───────────────────────────────────────────────┤                        
-  │ Blockchain payments   │ TON + TonConnect                   │ Trustless, borderless micropayments           │
-  ├───────────────────────┼────────────────────────────────────┼───────────────────────────────────────────────┤                        
-  │ Video calls           │ WebRTC + Firebase                  │ Peer-to-peer, no video server needed          │
-  ├───────────────────────┼────────────────────────────────────┼───────────────────────────────────────────────┤                        
-  │ AI Diagnosis          │ Python + Streamlit (separate repo) │ TensorFlow model for skin condition detection │
-  └───────────────────────┴────────────────────────────────────┴───────────────────────────────────────────────┘                        
-                                                            
-  ---                                                                                                                                   
-  This should give you everything you need for the project report. The AI section (Llama 3, LangChain, HAM10000 dataset, CNN model) you
-  said you'll cover separately.                                                                                                         
+---
+Overall Architecture
+
+┌─────────────────────────────────────────────────────────┐
+│                    THREE PORTALS                        │
+│                                                         │
+│  frontend/          doctor/           backend/          │
+│  (Patient App)      (Doctor App)      (Node.js API)     │
+│  React + Vite       React + Vite      Express + MongoDB │
+│  Port: 5173         Port: 5174        Port: 3000        │
+└─────────────────────────────────────────────────────────┘
+
+All three talk to one shared backend. The backend connects to MongoDB Atlas (cloud database), Cloudinary (image hosting), and Pinata (IPFS).
+
+---
+1. User Roles & Authentication
+
+There are three roles, each with their own auth:
+
+Patient (User)
+- Registers/logs in via /api/user/register and /api/user/login
+- Gets a JWT token stored in localStorage
+- Every protected request sends Authorization: Bearer <token> in the header
+- authUser middleware on the backend decodes the token → extracts userId → injects into req.body
+
+Doctor
+- Separate login at /api/doctor/login
+- Uses their own JWT token in the Doctor portal
+- authDoctor middleware protects doctor routes
+
+Admin
+- Hardcoded credentials in .env (ADMIN_EMAIL, ADMIN_PASSWORD)
+- On login, backend signs email+password as a JWT string
+- authAdmin middleware verifies it matches the stored credentials
+
+---
+2. Core Features
+
+Appointment Booking Flow
+
+Patient selects doctor → picks date/time slot
+     → POST /api/user/bookAppointment
+     → Backend checks if slot already taken (slots_booked map on Doctor model)
+     → Creates Appointment document in MongoDB
+     → Updates doctor's slots_booked
+Doctor model stores booked slots as:
+slots_booked: {
+  "25_11_2024": ["10:00 am", "11:00 am"],
+  "26_11_2024": ["2:00 pm"]
+}
+
+Video Consultation
+
+- Uses Firebase Firestore as a WebRTC signaling server
+- Patient and doctor both open /video-call
+- One side creates an offer → stores in Firestore → other side reads it and sends answer
+- Direct peer-to-peer video connection established (no video data goes through Firebase, only the connection handshake)
+
+Doctor Profile Images
+
+- Admin uploads a doctor's photo via the Add Doctor form
+- Multer saves the file temporarily to disk
+- Backend uploads it to Cloudinary → gets a permanent HTTPS URL
+- That URL is stored in the Doctor document in MongoDB
+
+---
+3. IPFS / Pinata Integration
+
+What problem does it solve?
+Medical data is sensitive. Storing it on a central server (MongoDB) means one breach exposes everything. IPFS (InterPlanetary File
+System) is a decentralized storage network where data is content-addressed — meaning a file is identified by a hash of its content,
+not a location. Pinata is a service that pins files to IPFS so they stay accessible.
+
+How it's used in AUREA:
+
+Patient Profile Image Upload
+
+Patient edits profile → selects new photo
+     → Frontend uploads file directly to Pinata API
+     → Pinata returns IPFS hash (e.g. "QmXyz...")
+     → Frontend constructs URL: https://gateway.pinata.cloud/ipfs/QmXyz...
+     → Saves that URL to user profile via PUT /api/user/updateProfileData
+
+Marketplace Data Upload (the main IPFS use case)
+
+Disease conditions in the listing form are restricted to the 7 classes from the
+HAM10000 dermatology dataset used to train the AI model:
+     Actinic Keratosis, Basal Cell Carcinoma, Benign Keratosis,
+     Dermatofibroma, Melanoma, Melanocytic Nevi, Vascular Lesion
+
+Patient fills "List My Data" form on Profile page
+     → Optionally selects a skin lesion image (JPG/PNG)
+     → If image selected: Frontend uploads image directly to Pinata API
+           → Pinata returns imageHash (IPFS hash of the image)
+     → Frontend sends form data + imageHash to POST /api/marketplace/list
+     → Backend (marketplaceController.js) takes the private fields:
+           { disease, ageRange, gender, symptoms, treatmentHistory, medications, imageHash }
+     → Converts private fields to JSON → uploads JSON bundle to Pinata via their API
+     → Pinata stores on IPFS → returns a content hash (ipfsHash)
+     → Backend stores a Marketplace listing in MongoDB:
+           { sellerId, disease, ageRange, priceInTON, ipfsHash, imageHash, buyers: [] }
+     → Both ipfsHash and imageHash are stored; ipfsHash is NEVER shown to buyers until they pay
+     → imageHash is optional — listings without an image are fully supported
+
+Why IPFS for this?
+- The data is stored decentrally — not on AUREA's servers
+- The patient owns their data (they have the hash)
+- Once purchased, a buyer gets a permanent, tamper-proof URL to the dataset
+- Nobody can alter the data after upload (content-addressed)
+
+---
+4. TON Blockchain Integration
+
+What is TON?
+TON (The Open Network) is a blockchain developed by Telegram. It's fast and has very low transaction fees (~0.01 TON = fractions of a
+cent). AUREA uses it for payments in the data marketplace.
+
+TonConnect
+TonConnect is a protocol (like WalletConnect for Ethereum) that lets users connect their TON wallet (e.g. Tonkeeper app) to a website
+without giving the site access to their private keys.
+
+How the payment flow works:
+
+Step 1 — Researcher visits /buy page
+         → Sees listings fetched from GET /api/marketplace/listings
+         → Listings show: disease, age range, price in TON (no IPFS hash yet)
+
+Step 2 — Researcher clicks "Connect TON Wallet"
+         → TonConnectUIProvider (in main.jsx) opens a QR code modal
+         → User scans with Tonkeeper app → wallet is connected
+         → useTonWallet() hook now returns wallet address
+
+Step 3 — Researcher clicks "Buy Data (0.1 TON)"
+         → Frontend calls tonConnectUI.sendTransaction({
+               address: PROJECT_WALLET,   ← receives the payment
+               amount: toNano("0.1")      ← converts TON to nanoton (1 TON = 10^9 nanoton)
+           })
+         → Tonkeeper app shows confirmation to user
+         → User approves → transaction sent to TON blockchain
+         → Returns a transaction BOC (bag of cells — TON's tx format) as proof
+
+Step 4 — Frontend sends proof to backend
+         → POST /api/marketplace/purchase { listingId, txHash: tx.boc }
+         → Backend records the purchase:
+               listing.buyers.push({ buyerId, txHash, purchasedAt })
+         → Backend returns the ipfsHash
+         → Frontend constructs: https://gateway.pinata.cloud/ipfs/<hash>
+         → "Buy Data" button changes to "View Data (IPFS)" link
+
+What the blockchain provides:
+- Payment is recorded on the TON blockchain permanently — immutable proof of purchase
+- No bank or payment gateway needed
+- Anyone worldwide can buy with crypto, no credit card or KYC
+- The txHash stored in MongoDB creates an audit trail linking each purchase to an on-chain transaction
+
+---
+5. Data Flow Diagram
+
+PATIENT (seller)                    RESEARCHER (buyer)
+─────────────────                   ──────────────────
+Profile page                        /buy page
+│                                   │
+│ Fill "List My Data" form           │ Connect TON wallet
+│   (optional skin image)           │        │
+│        │                          │        ▼
+│        ▼ (if image)               │   Backend API
+│   Pinata ← image file             │   /api/marketplace/listings
+│   Returns: imageHash              │        │
+│        │                          │        ▼
+│        ▼                          │   MongoDB (public fields only)
+│   Backend API                     │   (ipfsHash hidden)
+│   /api/marketplace/list           │
+│        │                          │   Researcher clicks Buy
+│        ▼                          │        │
+│   Pinata/IPFS ← JSON data         │        ▼
+│   Returns: ipfsHash               │   TON Blockchain payment
+│        │                          │        │
+│        ▼                          │        ▼
+│   MongoDB Listing                 │   Backend /api/marketplace/purchase
+│   { ipfsHash: "Qm...",            │   { txHash recorded, ipfsHash returned }
+│     imageHash: "Qm..." (opt),     │        │
+│     priceInTON: 0.1 }             │        ▼
+│                                   │   https://gateway.pinata.cloud/ipfs/Qm...
+│                                   │   (buyer can now access the data)
+
+---
+6. Database Models Summary
+
+┌─────────────┬─────────────────┬──────────────────────────────────────────────────────────────────┐
+│    Model    │     Purpose     │                           Key Fields                             │
+├─────────────┼─────────────────┼──────────────────────────────────────────────────────────────────┤
+│ User        │ Patient account │ name, email, password (hashed), image (IPFS URL)                 │
+├─────────────┼─────────────────┼──────────────────────────────────────────────────────────────────┤
+│ Doctor      │ Doctor account  │ name, speciality, fees, slots_booked, available                  │
+├─────────────┼─────────────────┼──────────────────────────────────────────────────────────────────┤
+│ Appointment │ Booking record  │ userId, docId, slotDate, slotTime, payment, cancelled            │
+├─────────────┼─────────────────┼──────────────────────────────────────────────────────────────────┤
+│ Marketplace │ Data listing    │ sellerId, disease, priceInTON, ipfsHash, imageHash (opt), buyers[]│
+└─────────────┴─────────────────┴──────────────────────────────────────────────────────────────────┘
+
+---
+7. Backend API Routes
+
+┌──────────────────────────────────┬────────────┬─────────────────────────────────────┐
+│              Route               │    Auth    │              Purpose                │
+├──────────────────────────────────┼────────────┼─────────────────────────────────────┤
+│ POST /api/user/register          │ None       │ Create patient account              │
+├──────────────────────────────────┼────────────┼─────────────────────────────────────┤
+│ POST /api/user/login             │ None       │ Get JWT token                       │
+├──────────────────────────────────┼────────────┼─────────────────────────────────────┤
+│ GET /api/user/getProfile         │ User JWT   │ Fetch own profile                   │
+├──────────────────────────────────┼────────────┼─────────────────────────────────────┤
+│ PUT /api/user/updateProfileData  │ User JWT   │ Save profile changes                │
+├──────────────────────────────────┼────────────┼─────────────────────────────────────┤
+│ POST /api/user/bookAppointment   │ User JWT   │ Book a slot                         │
+├──────────────────────────────────┼────────────┼─────────────────────────────────────┤
+│ GET /api/user/listAppointments   │ User JWT   │ My appointments                     │
+├──────────────────────────────────┼────────────┼─────────────────────────────────────┤
+│ POST /api/user/cancelAppointment │ User JWT   │ Cancel booking                      │
+├──────────────────────────────────┼────────────┼─────────────────────────────────────┤
+│ GET /api/doctor/list             │ None       │ All doctors (for browsing)          │
+├──────────────────────────────────┼────────────┼─────────────────────────────────────┤
+│ POST /api/doctor/login           │ None       │ Doctor login                        │
+├──────────────────────────────────┼────────────┼─────────────────────────────────────┤
+│ GET /api/doctor/appointments     │ Doctor JWT │ Doctor's bookings                   │
+├──────────────────────────────────┼────────────┼─────────────────────────────────────┤
+│ POST /api/admin/addDoctor        │ Admin JWT  │ Add new doctor                      │
+├──────────────────────────────────┼────────────┼─────────────────────────────────────┤
+│ POST /api/marketplace/list       │ User JWT   │ List data on IPFS (+ optional image)│
+├──────────────────────────────────┼────────────┼─────────────────────────────────────┤
+│ GET /api/marketplace/listings    │ None       │ Browse marketplace                  │
+├──────────────────────────────────┼────────────┼─────────────────────────────────────┤
+│ POST /api/marketplace/purchase   │ User JWT   │ Record TON payment, get IPFS access │
+├──────────────────────────────────┼────────────┼─────────────────────────────────────┤
+│ GET /api/marketplace/mylistings  │ User JWT   │ My listed datasets                  │
+├──────────────────────────────────┼────────────┼─────────────────────────────────────┤
+│ GET /api/marketplace/mypurchases │ User JWT   │ Datasets I bought                   │
+└──────────────────────────────────┴────────────┴─────────────────────────────────────┘
+
+---
+8. Tech Stack Summary Table
+
+┌───────────────────────┬────────────────────────────────────┬───────────────────────────────────────────────┐
+│         Layer         │            Technology              │                      Why                      │
+├───────────────────────┼────────────────────────────────────┼───────────────────────────────────────────────┤
+│ Frontend UI           │ React + Vite + Tailwind            │ Fast SPA, responsive design                   │
+├───────────────────────┼────────────────────────────────────┼───────────────────────────────────────────────┤
+│ Backend API           │ Node.js + Express                  │ REST API, JWT auth                            │
+├───────────────────────┼────────────────────────────────────┼───────────────────────────────────────────────┤
+│ Database              │ MongoDB Atlas                      │ Flexible schema for medical data              │
+├───────────────────────┼────────────────────────────────────┼───────────────────────────────────────────────┤
+│ Image hosting         │ Cloudinary                         │ Managed CDN for doctor photos                 │
+├───────────────────────┼────────────────────────────────────┼───────────────────────────────────────────────┤
+│ Decentralized storage │ IPFS via Pinata                    │ Immutable, decentralized medical data + images│
+├───────────────────────┼────────────────────────────────────┼───────────────────────────────────────────────┤
+│ Blockchain payments   │ TON + TonConnect                   │ Trustless, borderless micropayments           │
+├───────────────────────┼────────────────────────────────────┼───────────────────────────────────────────────┤
+│ Video calls           │ WebRTC + Firebase                  │ Peer-to-peer, no video server needed          │
+├───────────────────────┼────────────────────────────────────┼───────────────────────────────────────────────┤
+│ AI Diagnosis          │ Python + Streamlit (separate repo) │ TensorFlow model for skin condition detection │
+└───────────────────────┴────────────────────────────────────┴───────────────────────────────────────────────┘
+
+---
+This should give you everything you need for the project report. The AI section (Llama 3, LangChain, HAM10000 dataset, CNN model) you
+said you'll cover separately.

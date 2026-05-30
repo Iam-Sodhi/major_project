@@ -15,6 +15,7 @@ const marketplaceSchema = new mongoose.Schema({
     description: { type: String, required: true },
     priceInTON: { type: Number, required: true },
     ipfsHash: { type: String, required: true },
+    imageHash: { type: String, default: '' },
     status: { type: String, enum: ['active', 'sold'], default: 'active' },
     buyers: { type: [purchaseSchema], default: [] },
     createdAt: { type: Number, default: Date.now }

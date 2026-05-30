@@ -21,7 +21,7 @@ const uploadToIPFS = async (data) => {
 const createListing = async (req, res) => {
     try {
         const { userId } = req.body;
-        const { disease, ageRange, gender, location, description, priceInTON, fullData } = req.body;
+        const { disease, ageRange, gender, location, description, priceInTON, fullData, imageHash } = req.body;
 
         if (!disease || !ageRange || !gender || !location || !description || !priceInTON || !fullData) {
             return res.json({ success: false, message: 'Missing required fields' });
@@ -38,6 +38,7 @@ const createListing = async (req, res) => {
             description,
             priceInTON: Number(priceInTON),
             ipfsHash,
+            imageHash: imageHash || '',
         });
 
         await listing.save();

@@ -6,8 +6,13 @@ import Layout from "../../pages/Layout.jsx";
 import { Camera, Save, Edit, Database, Plus, ExternalLink } from "lucide-react";
 
 const SKIN_CONDITIONS = [
-  "Eczema", "Psoriasis", "Rosacea", "Melanoma", "Acne",
-  "Vitiligo", "Dermatitis", "Urticaria", "Other"
+  "Actinic Keratosis",
+  "Basal Cell Carcinoma",
+  "Benign Keratosis",
+  "Dermatofibroma",
+  "Melanoma",
+  "Melanocytic Nevi",
+  "Vascular Lesion",
 ];
 
 function Profile() {
@@ -17,10 +22,11 @@ function Profile() {
   const [showListForm, setShowListForm] = useState(false);
   const [myListings, setMyListings] = useState([]);
   const [listForm, setListForm] = useState({
-    disease: "Eczema", ageRange: "20-30", gender: "Male",
+    disease: "Actinic Keratosis", ageRange: "18-25", gender: "Male",
     location: "", description: "", priceInTON: "0.1",
     fullData: { symptoms: "", treatmentHistory: "", medications: "" },
   });
+  const [skinImage, setSkinImage] = useState(null);
   const [listing, setListing] = useState(false);
 
   const { backendUrl, userData, setUserData, token, loadUserProfileData } =
@@ -121,15 +127,22 @@ function Profile() {
     }
     setListing(true);
     try {
+      let imageHash = "";
+      if (skinImage) {
+        imageHash = await uploadToPinata(skinImage);
+        if (!imageHash) { setListing(false); return; }
+      }
+
       const { data } = await axios.post(
         `${backendUrl}/api/marketplace/list`,
-        listForm,
+        { ...listForm, imageHash },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (data.success) {
         toast.success("Data listed on marketplace!");
         setShowListForm(false);
-        setListForm({ disease: "Eczema", ageRange: "20-30", gender: "Male", location: "", description: "", priceInTON: "0.1", fullData: { symptoms: "", treatmentHistory: "", medications: "" } });
+        setSkinImage(null);
+        setListForm({ disease: "Actinic Keratosis", ageRange: "18-25", gender: "Male", location: "", description: "", priceInTON: "0.1", fullData: { symptoms: "", treatmentHistory: "", medications: "" } });
         fetchMyListings();
       } else {
         toast.error(data.message);
@@ -374,6 +387,25 @@ function Profile() {
                     <input type="number" step="0.01" min="0.01" className="w-full rounded border border-gray-200 p-2 text-sm"
                       value={listForm.priceInTON} onChange={(e) => setListForm(p => ({ ...p, priceInTON: e.target.value }))} />
                   </div>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Skin Image (optional)</label>
+                  <label htmlFor="skin-image" className="cursor-pointer">
+                    <div className="flex items-center gap-3 rounded border border-dashed border-purple-300 bg-white p-3 hover:bg-purple-50">
+                      {skinImage ? (
+                        <img src={URL.createObjectURL(skinImage)} className="h-16 w-16 rounded object-cover" alt="preview" />
+                      ) : (
+                        <div className="flex h-16 w-16 items-center justify-center rounded bg-purple-50">
+                          <Camera className="h-6 w-6 text-purple-300" />
+                        </div>
+                      )}
+                      <span className="text-xs text-gray-500">
+                        {skinImage ? skinImage.name : "Upload skin lesion image (JPG, PNG)"}
+                      </span>
+                    </div>
+                    <input type="file" id="skin-image" accept="image/*" hidden
+                      onChange={(e) => setSkinImage(e.target.files[0] || null)} />
+                  </label>
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-gray-600">Public Description (no personal info)</label>
