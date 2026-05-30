@@ -12,7 +12,7 @@ const AppContextProvider = (props) => {
     const [doctors,setDoctorsData] = useState([]);
     const [token,setToken] = useState(localStorage.getItem('token') ? localStorage.getItem('token') : false)
     const [adminToken, setAdminToken] = useState(
-    localStorage.getItem('adminToken') || null
+    localStorage.getItem('adminToken') || false
 );
 
     // const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3MWZjODQ0ZmQ1NmFlNWUwYzhiZDFmZSIsImlhdCI6MTczMTE0NzU3Mn0.odpzoGq3oQccHrHj3F_11e202pAC6Jwbnuvg94sJmxY'
