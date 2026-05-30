@@ -16,10 +16,10 @@ import AboutUs from './components/AboutUs/AboutUs.jsx'
 import ContactUs from './components/ContactUs/ContactUs.jsx';
 import VideoCall from './components/VideoCall/VideoCall.jsx';
 
-import AdminLogin from './admin/AdminLogin.jsx';
-import AdminDashboard from './admin/AdminDashboard.jsx';
-import AdminDoctors from './admin/AdminDoctors.jsx';
-import AdminAppointments from './admin/AdminAppointments.jsx';
+import AdminLogin from './Admin/AdminLogin.jsx';
+import AdminDashboard from './Admin/AdminDashboard.jsx';
+import AdminDoctors from './Admin/AdminDoctors.jsx';
+import AdminAppointments from './Admin/AdminAppointments.jsx';
 const App = () => {
 
   return (
