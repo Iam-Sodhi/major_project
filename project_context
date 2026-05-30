@@ -54,12 +54,6 @@ slots_booked: {
   "26_11_2024": ["2:00 pm"]
 }
 
-Video Consultation
-
-- Uses Firebase Firestore as a WebRTC signaling server
-- Patient and doctor both open /video-call
-- One side creates an offer → stores in Firestore → other side reads it and sends answer
-- Direct peer-to-peer video connection established (no video data goes through Firebase, only the connection handshake)
 
 Doctor Profile Images
 

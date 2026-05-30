@@ -36,5 +36,4 @@ app.get('/',(req,res) => {
 // Listener 
 app.listen(port,() => {
     console.log(`server stated on http://localhost:${port}`);
-    
 })
