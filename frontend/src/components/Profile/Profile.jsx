@@ -1,13 +1,27 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { AppContext } from "../../context/AppContext.jsx";
 import { toast } from "react-toastify";
 import axios from "axios";
 import Layout from "../../pages/Layout.jsx";
-import { Camera, Save, Edit } from "lucide-react";
+import { Camera, Save, Edit, Database, Plus, ExternalLink } from "lucide-react";
+
+const SKIN_CONDITIONS = [
+  "Eczema", "Psoriasis", "Rosacea", "Melanoma", "Acne",
+  "Vitiligo", "Dermatitis", "Urticaria", "Other"
+];
 
 function Profile() {
   const [isEdit, setIsEdit] = useState(false);
-  const [image, setImage] = useState(null); // selected file
+  const [image, setImage] = useState(null);
+
+  const [showListForm, setShowListForm] = useState(false);
+  const [myListings, setMyListings] = useState([]);
+  const [listForm, setListForm] = useState({
+    disease: "Eczema", ageRange: "20-30", gender: "Male",
+    location: "", description: "", priceInTON: "0.1",
+    fullData: { symptoms: "", treatmentHistory: "", medications: "" },
+  });
+  const [listing, setListing] = useState(false);
 
   const { backendUrl, userData, setUserData, token, loadUserProfileData } =
     useContext(AppContext);
@@ -62,7 +76,7 @@ function Profile() {
       };
 
       const { data } = await axios.put(
-        `${backendUrl}/api/user/updateProfiledata`,
+        `${backendUrl}/api/user/updateProfileData`,
         updatedUser,
         {
           headers: {
@@ -87,6 +101,45 @@ function Profile() {
   };
 
   const handleEdit = () => setIsEdit(!isEdit);
+
+  const fetchMyListings = async () => {
+    if (!token) return;
+    try {
+      const { data } = await axios.get(`${backendUrl}/api/marketplace/mylistings`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (data.success) setMyListings(data.listings);
+    } catch (_) {}
+  };
+
+  useEffect(() => { fetchMyListings(); }, [token]);
+
+  const handleListData = async (e) => {
+    e.preventDefault();
+    if (!listForm.location || !listForm.description) {
+      return toast.error("Please fill all required fields");
+    }
+    setListing(true);
+    try {
+      const { data } = await axios.post(
+        `${backendUrl}/api/marketplace/list`,
+        listForm,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (data.success) {
+        toast.success("Data listed on marketplace!");
+        setShowListForm(false);
+        setListForm({ disease: "Eczema", ageRange: "20-30", gender: "Male", location: "", description: "", priceInTON: "0.1", fullData: { symptoms: "", treatmentHistory: "", medications: "" } });
+        fetchMyListings();
+      } else {
+        toast.error(data.message);
+      }
+    } catch (err) {
+      toast.error("Failed to list data");
+    } finally {
+      setListing(false);
+    }
+  };
 
   return (
     
@@ -266,11 +319,126 @@ function Profile() {
               </div>
             </div>
           </div>
+          {/* Data Marketplace Section */}
+          <div className="mt-6 rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Database className="h-5 w-5 text-purple-600" />
+                <h3 className="text-xl font-semibold text-charcoal">Data Marketplace</h3>
+              </div>
+              <button
+                onClick={() => setShowListForm(!showListForm)}
+                className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm text-white hover:bg-purple-700"
+              >
+                <Plus className="h-4 w-4" />
+                List My Data
+              </button>
+            </div>
+
+            <p className="mb-4 text-sm text-gray-500">
+              Anonymize and sell your medical data to researchers. You control what you share and set your own price in TON.
+            </p>
+
+            {showListForm && (
+              <form onSubmit={handleListData} className="mb-6 rounded-lg border border-purple-100 bg-purple-50 p-4 space-y-3">
+                <h4 className="font-medium text-purple-800">New Listing</h4>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-600">Condition</label>
+                    <select className="w-full rounded border border-gray-200 p-2 text-sm"
+                      value={listForm.disease} onChange={(e) => setListForm(p => ({ ...p, disease: e.target.value }))}>
+                      {SKIN_CONDITIONS.map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-600">Age Range</label>
+                    <select className="w-full rounded border border-gray-200 p-2 text-sm"
+                      value={listForm.ageRange} onChange={(e) => setListForm(p => ({ ...p, ageRange: e.target.value }))}>
+                      {["18-25","26-35","36-45","46-55","56-65","65+"].map(r => <option key={r}>{r}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-600">Gender</label>
+                    <select className="w-full rounded border border-gray-200 p-2 text-sm"
+                      value={listForm.gender} onChange={(e) => setListForm(p => ({ ...p, gender: e.target.value }))}>
+                      <option>Male</option><option>Female</option><option>Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-600">Location (region/country)</label>
+                    <input className="w-full rounded border border-gray-200 p-2 text-sm" placeholder="e.g. Mumbai, India"
+                      value={listForm.location} onChange={(e) => setListForm(p => ({ ...p, location: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-600">Price (TON)</label>
+                    <input type="number" step="0.01" min="0.01" className="w-full rounded border border-gray-200 p-2 text-sm"
+                      value={listForm.priceInTON} onChange={(e) => setListForm(p => ({ ...p, priceInTON: e.target.value }))} />
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Public Description (no personal info)</label>
+                  <textarea className="w-full rounded border border-gray-200 p-2 text-sm" rows={2} placeholder="Brief anonymized summary..."
+                    value={listForm.description} onChange={(e) => setListForm(p => ({ ...p, description: e.target.value }))} />
+                </div>
+                <h5 className="text-xs font-semibold text-gray-600 pt-1">Private Data (stored encrypted on IPFS)</h5>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Symptoms</label>
+                    <input className="w-full rounded border border-gray-200 p-2 text-sm" placeholder="Main symptoms..."
+                      value={listForm.fullData.symptoms} onChange={(e) => setListForm(p => ({ ...p, fullData: { ...p.fullData, symptoms: e.target.value } }))} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Treatment History</label>
+                    <input className="w-full rounded border border-gray-200 p-2 text-sm" placeholder="Treatments tried..."
+                      value={listForm.fullData.treatmentHistory} onChange={(e) => setListForm(p => ({ ...p, fullData: { ...p.fullData, treatmentHistory: e.target.value } }))} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Medications</label>
+                    <input className="w-full rounded border border-gray-200 p-2 text-sm" placeholder="Current medications..."
+                      value={listForm.fullData.medications} onChange={(e) => setListForm(p => ({ ...p, fullData: { ...p.fullData, medications: e.target.value } }))} />
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button type="submit" disabled={listing}
+                    className="rounded-lg bg-purple-600 px-4 py-2 text-sm text-white hover:bg-purple-700 disabled:opacity-60">
+                    {listing ? "Uploading to IPFS..." : "Submit Listing"}
+                  </button>
+                  <button type="button" onClick={() => setShowListForm(false)}
+                    className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {myListings.length > 0 ? (
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-gray-600">My Listings</h4>
+                {myListings.map((l) => (
+                  <div key={l._id} className="flex items-center justify-between rounded-lg border border-gray-100 p-3">
+                    <div>
+                      <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">{l.disease}</span>
+                      <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-medium ${l.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{l.status}</span>
+                      <p className="mt-1 text-xs text-gray-500">{l.priceInTON} TON · {l.buyers?.length || 0} purchase(s)</p>
+                    </div>
+                    <a href={`https://gateway.pinata.cloud/ipfs/${l.ipfsHash}`} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-blue-500 hover:underline">
+                      IPFS <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">No listings yet. Click "List My Data" to get started.</p>
+            )}
+          </div>
+
         </div>
       </div>
     </Layout>
-                    
+
   );
+
 }
 
 export default Profile;

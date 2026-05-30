@@ -5,10 +5,6 @@ import jwt from 'jsonwebtoken'
 import bcrypt from 'bcrypt'
 import {v2 as cloudinary} from 'cloudinary' 
 import appointmentModel from "../models/appointmentModel.js";
-import FormData from 'form-data';
-import axios from "axios";
-
-import razorpay from 'razorpay'
 
 //api to register user
 const registerUser = async(req,res) => {
@@ -149,7 +145,7 @@ const bookAppointment = async(req,res) => {
 
         let slots_booked = docData.slots_booked
         if(slots_booked[slotDate]){
-            if(slots_booked[slotDate].includes[slotTime]){
+            if(slots_booked[slotDate].includes(slotTime)){
                 return res.json({success:false,message:"slot not available"});
             }
             else{
@@ -226,21 +222,6 @@ const cancelAppointment = async(req,res) => {
         await doctorModel.findByIdAndUpdate(docId,{slots_booked});
 
         res.json({success:true,message:"Appointment cancelled"})
-    }
-    catch(err){
-        console.log(err);   
-        res.json({success:false,message:err});
-    }
-}
-
-// const razorpayInstance = new razorpay({
-//     key_id : '',
-//     key_secret: ''
-// })
-
-const paymentRazorpay = async(req,res) => {
-    try{
-
     }
     catch(err){
         console.log(err);   

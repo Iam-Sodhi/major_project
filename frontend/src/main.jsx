@@ -4,20 +4,16 @@ import './index.css'
 import App from './App.jsx'
 import { BrowserRouter } from 'react-router-dom'
 import AppContextProvider from './context/AppContext.jsx'
-import { Auth0Provider } from '@auth0/auth0-react';
+import { TonConnectUIProvider } from '@tonconnect/ui-react';
+
+const TON_MANIFEST_URL = `${window.location.origin}/tonconnect-manifest.json`;
 
 createRoot(document.getElementById('root')).render(
-  <Auth0Provider
-    domain="dev-aupld65eqfjdtkho.us.auth0.com"
-    clientId="gplpwpDcibmqK0hHqJQjYxO4boioqtOa"
-    authorizationParams={{
-      redirect_uri: window.location.origin
-    }}
-  >
+  <TonConnectUIProvider manifestUrl={TON_MANIFEST_URL}>
     <BrowserRouter>
       <AppContextProvider>
         <App />
       </AppContextProvider>
     </BrowserRouter>
-  </Auth0Provider>,
+  </TonConnectUIProvider>,
 )

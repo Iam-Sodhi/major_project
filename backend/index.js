@@ -5,6 +5,7 @@ import connectDB from './config/db.js';
 import adminRouter from './routes/adminRoute.js';
 import doctorRouter from './routes/doctorRoute.js';
 import userRouter from './routes/userRoute.js';
+import marketplaceRouter from './routes/marketplaceRoute.js';
 import connectCloudinary from './config/cloudinary.js';
 
 
@@ -22,9 +23,10 @@ app.use(cors())
 
 
 //api endpoints
-app.use('/api/admin',adminRouter)  
+app.use('/api/admin',adminRouter)
 app.use('/api/doctor',doctorRouter)
 app.use('/api/user',userRouter)
+app.use('/api/marketplace',marketplaceRouter)
 
 //Server health 
 app.get('/',(req,res) => {

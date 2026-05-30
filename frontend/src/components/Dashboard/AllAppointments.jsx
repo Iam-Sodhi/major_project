@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom'
 function AllAppointments() {
   const { backendUrl, token, getDoctorsData } = useContext(AppContext);
   const [appointments, setAppointments] = useState([]);
-  const [paymentStatus, setPaymentStatus] = useState(false);
+  const [paidAppointments, setPaidAppointments] = useState(new Set());
   const months = [
     "",
     "Jan",
@@ -71,14 +71,16 @@ function AllAppointments() {
     }
   };
 
-  const isTimeForVideoCall = (appointmentTime) => {
-    const currentTime = new Date();
-    const appointmentDate = new Date(appointmentTime);
-    return currentTime >= appointmentDate;
+  const isTimeForVideoCall = (slotDate) => {
+    const parts = slotDate.split("_");
+    if (parts.length !== 3) return false;
+    const [day, month, year] = parts;
+    const appointmentDate = new Date(year, Number(month) - 1, day);
+    return new Date() >= appointmentDate;
   };
 
-  const handlePayment = () => {
-    setPaymentStatus(true)
+  const handlePayment = (appointmentId) => {
+    setPaidAppointments((prev) => new Set([...prev, appointmentId]));
   };
 
   useEffect(() => {
@@ -134,24 +136,29 @@ function AllAppointments() {
             {/* Action Buttons */}
             {!item.cancelled && (
               <div className="flex flex-wrap gap-3">
-                {isTimeForVideoCall(item.slotDate + " " + item.slotTime) && (
-                  <button className="flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-white transition-colors hover:bg-blue-600">
+                {isTimeForVideoCall(item.slotDate) && (
+                  <button
+                    onClick={() => navigate("/video-call")}
+                    className="flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-white transition-colors hover:bg-blue-600"
+                  >
                     <Video className="h-4 w-4" />
                     Join Video Call
                   </button>
                 )}
-                {
-                  !paymentStatus ? (
-                    <button className="flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 text-white transition-colors hover:bg-green-600" onClick={() => handlePayment()}>
-                  <CreditCard className="h-4 w-4" />
-                  Pay Now
-                </button> ) : (
-                  <button className="flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 text-white transition-colors hover:bg-green-600" onClick={() => navigate("/video-call")}>
-                  <CreditCard className="h-4 w-4" />
-                  Launch Meet
-                </button>
-                )
-                }
+                {!paidAppointments.has(item._id) ? (
+                  <button
+                    className="flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 text-white transition-colors hover:bg-green-600"
+                    onClick={() => handlePayment(item._id)}
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    Pay Now
+                  </button>
+                ) : (
+                  <span className="flex items-center gap-2 rounded-lg bg-green-100 px-4 py-2 text-green-700 text-sm font-medium">
+                    <CreditCard className="h-4 w-4" />
+                    Paid
+                  </span>
+                )}
                 <button
                   onClick={() => cancelAppointment(item._id)}
                   className="flex items-center gap-2 rounded-lg border border-red-500 px-4 py-2 text-red-500 transition-colors hover:bg-red-50"
