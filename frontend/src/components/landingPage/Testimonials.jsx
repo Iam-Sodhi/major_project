@@ -20,27 +20,21 @@ const Testimonials = ({
   const items = [
     {
         quote: "qwertyuiop",
-        name: "Karandeep Singh",
+        name: "Suhani Jagotra",
         title: "AI Engineer",
-        img: "/people/karan.png"
+        img: "/people/suhani.png"
     },
     {
         quote: "qwertyuiop",
-        name: "Arnav Anand",
+        name: "Tisha Singla",
         title: "Product Designer",
-        img: "/people/arnav.png"
+        img: "/people/tisha.png"
     },
     {
         quote: "qwertyuiop",
-        name: "Ekaspreet Singh Atwal",
+        name: "Gautam Sodhi",
         title: "System Architect",
-        img: '/people/ekas.jpg'
-    },
-    {
-        quote: "qwertyuiop",
-        name: "Saurabh Sahu",
-        title: "Frontend Engineer",
-        img: '/people/saurabh.png'
+        img: '/people/gautam.jpg'
     }
   ];
 
